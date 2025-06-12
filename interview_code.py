@@ -801,4 +801,281 @@
 
             // Speak feedback summary
             if (voiceEnabled) {
-                const summary = `Your score is ${feedback.score} out of 100. ${feedback.score >= 80 ? 'Excellent work!' : feedback.score >= 60 ? 'Good job, with room for
+                const summary = `Your score is ${feedback.score} out of 100. ${feedback.score >= 80 ? 'Excellent work!' : feedback.score >= 60 ? 'Good job, with room for improvement.' : 'Keep practicing to improve your skills.'}`;
+                setTimeout(() => speakText(summary), 1000);
+            }
+        }
+
+        function displayFeedback(data) {
+            const container = document.getElementById('feedback-container');
+            const scorePercentage = (data.score / 100) * 360;
+            
+            container.innerHTML = `
+                <div class="feedback-container">
+                    <div class="score-display">
+                        <div class="score-circle" style="--score-deg: ${scorePercentage}deg;">
+                            <span class="score-text">${data.score}%</span>
+                        </div>
+                        <div>
+                            <h3 style="color: #f1f5f9; margin-bottom: 0.5rem;">
+                                <i class="fas fa-robot"></i> AI Analysis Complete
+                            </h3>
+                            <p style="color: #cbd5e1;">Detailed feedback generated</p>
+                        </div>
+                    </div>
+                    <div style="color: #e2e8f0; line-height: 1.6;">
+                        ${data.feedback}
+                    </div>
+                </div>
+            `;
+            container.classList.remove('hidden');
+        }
+
+        function generateMockFeedback(question, answer) {
+            // This is a mock function - replace with actual API call to your AI service
+            const score = Math.floor(Math.random() * 40) + 60; // Random score between 60-100
+            
+            const feedbacks = {
+                sql: {
+                    high: "**Excellent SQL Skills!** ✨\n\n**Strengths:**\n- Proper use of JOIN operations\n- Correct aggregation functions\n- Good understanding of GROUP BY and ORDER BY\n\n**Areas for Improvement:**\n- Consider adding error handling\n- Could optimize with indexes",
+                    medium: "**Good SQL Foundation** 📊\n\n**Strengths:**\n- Basic query structure is correct\n- Shows understanding of table relationships\n\n**Areas for Improvement:**\n- Work on complex joins\n- Practice with window functions\n- Consider performance optimization",
+                    low: "**Keep Learning SQL** 💪\n\n**Strengths:**\n- Shows effort and basic understanding\n\n**Areas for Improvement:**\n- Review JOIN syntax\n- Practice aggregation functions\n- Study database normalization"
+                },
+                python: {
+                    high: "**Outstanding Python Code!** 🐍\n\n**Strengths:**\n- Clean, readable code\n- Proper error handling\n- Efficient algorithm choice\n- Good variable naming\n\n**Areas for Improvement:**\n- Add more comments\n- Consider edge cases",
+                    medium: "**Solid Python Skills** 🔧\n\n**Strengths:**\n- Logic is mostly correct\n- Shows problem-solving ability\n\n**Areas for Improvement:**\n- Optimize time complexity\n- Add input validation\n- Use more Pythonic approaches",
+                    low: "**Python Practice Needed** 📚\n\n**Strengths:**\n- Shows understanding of basic concepts\n\n**Areas for Improvement:**\n- Review Python syntax\n- Practice with data structures\n- Study algorithm fundamentals"
+                },
+                ml: {
+                    high: "**Excellent ML Knowledge!** 🧠\n\n**Strengths:**\n- Deep understanding of concepts\n- Good real-world examples\n- Clear explanations\n\n**Areas for Improvement:**\n- Include more mathematical details\n- Discuss recent developments",
+                    medium: "**Good ML Foundation** 📈\n\n**Strengths:**\n- Understands core concepts\n- Provides relevant examples\n\n**Areas for Improvement:**\n- Dive deeper into algorithms\n- Practice with real datasets\n- Study model evaluation metrics",
+                    low: "**ML Learning Journey** 🚀\n\n**Strengths:**\n- Shows interest in the field\n\n**Areas for Improvement:**\n- Study fundamental concepts\n- Practice with hands-on projects\n- Review statistics and linear algebra"
+                }
+            };
+
+            const section = question.section.toLowerCase().replace(' ', '');
+            const level = score >= 80 ? 'high' : score >= 65 ? 'medium' : 'low';
+            
+            return {
+                score: score,
+                feedback: feedbacks[section][level]
+            };
+        }
+
+        function previousQuestion() {
+            if (currentQuestion > 0) {
+                currentQuestion--;
+                loadQuestion();
+            }
+        }
+
+        function nextQuestion() {
+            if (currentQuestion < questions.length - 1) {
+                currentQuestion++;
+                loadQuestion();
+            }
+        }
+
+        function finishInterview() {
+            document.getElementById('interview-screen').classList.add('hidden');
+            document.getElementById('results-screen').classList.remove('hidden');
+            displayResults();
+        }
+
+        function displayResults() {
+            // Calculate overall score
+            let totalScore = 0;
+            let answeredQuestions = 0;
+            
+            Object.values(userAnswers).forEach(answer => {
+                if (answer.score !== undefined) {
+                    totalScore += answer.score;
+                    answeredQuestions++;
+                }
+            });
+            
+            const overallScore = answeredQuestions > 0 ? Math.round(totalScore / answeredQuestions) : 0;
+            
+            // Update overall score display
+            const scoreCircle = document.getElementById('overall-score-circle');
+            const scoreText = document.getElementById('overall-score-text');
+            const scorePercentage = (overallScore / 100) * 360;
+            
+            scoreCircle.style.setProperty('--score-deg', `${scorePercentage}deg`);
+            scoreText.textContent = `${overallScore}%`;
+            
+            // Calculate section scores
+            const sectionScores = {
+                'SQL': [],
+                'Python': [],
+                'Machine Learning': []
+            };
+            
+            questions.forEach((q, index) => {
+                const answer = userAnswers[index];
+                if (answer && answer.score !== undefined) {
+                    sectionScores[q.section].push(answer.score);
+                }
+            });
+            
+            // Display section analysis
+            const sectionAnalysis = document.getElementById('section-analysis');
+            const sectionIcons = {
+                'SQL': 'fas fa-database',
+                'Python': 'fab fa-python', 
+                'Machine Learning': 'fas fa-brain'
+            };
+            const sectionColors = {
+                'SQL': '#f59e0b',
+                'Python': '#10b981',
+                'Machine Learning': '#8b5cf6'
+            };
+            
+            sectionAnalysis.innerHTML = Object.entries(sectionScores).map(([section, scores]) => {
+                const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+                const sectionClass = section.toLowerCase().replace(' ', '-');
+                
+                return `
+                    <div class="analysis-card ${sectionClass}">
+                        <i class="${sectionIcons[section]}" style="font-size: 2rem; color: ${sectionColors[section]}; margin-bottom: 1rem;"></i>
+                        <h3 style="color: #f1f5f9; margin-bottom: 0.5rem;">${section}</h3>
+                        <div style="font-size: 2rem; font-weight: bold; color: ${sectionColors[section]};">${avgScore}%</div>
+                        <div style="background: rgba(0,0,0,0.3); height: 8px; border-radius: 4px; margin-top: 1rem;">
+                            <div style="background: ${sectionColors[section]}; height: 100%; width: ${avgScore}%; border-radius: 4px; transition: width 1s ease;"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Speak results summary
+            if (voiceEnabled) {
+                const resultsSummary = `Interview completed! Your overall score is ${overallScore} percent. ${overallScore >= 80 ? 'Outstanding performance!' : overallScore >= 70 ? 'Great job overall!' : overallScore >= 60 ? 'Good effort with room for improvement.' : 'Keep practicing to enhance your skills.'}`;
+                setTimeout(() => speakText(resultsSummary), 1500);
+            }
+        }
+
+        function restartInterview() {
+            // Reset state
+            currentQuestion = 0;
+            userAnswers = {};
+            
+            // Show welcome screen
+            document.getElementById('results-screen').classList.add('hidden');
+            document.getElementById('welcome-screen').classList.remove('hidden');
+            
+            // Stop any ongoing speech
+            speechSynthesis.cancel();
+        }
+
+        function downloadReport() {
+            // Generate a simple text report
+            let report = "AI Interview Coach - Performance Report\n";
+            report += "=====================================\n\n";
+            
+            let totalScore = 0;
+            let answeredQuestions = 0;
+            
+            questions.forEach((q, index) => {
+                const answer = userAnswers[index];
+                if (answer) {
+                    report += `Question ${index + 1} (${q.section}):\n`;
+                    report += `${q.question}\n\n`;
+                    report += `Your Answer:\n${answer.answer}\n\n`;
+                    if (answer.score !== undefined) {
+                        report += `Score: ${answer.score}/100\n`;
+                        report += `Feedback: ${answer.feedback.replace(/\*\*/g, '').replace(/\n/g, ' ')}\n\n`;
+                        totalScore += answer.score;
+                        answeredQuestions++;
+                    }
+                    report += "---\n\n";
+                }
+            });
+            
+            const overallScore = answeredQuestions > 0 ? Math.round(totalScore / answeredQuestions) : 0;
+            report += `Overall Score: ${overallScore}%\n`;
+            report += `Generated on: ${new Date().toLocaleDateString()}\n`;
+            
+            // Create and download file
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `interview-report-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Auto-save answers
+        document.addEventListener('DOMContentLoaded', function() {
+            const answerInput = document.getElementById('answer-input');
+            if (answerInput) {
+                answerInput.addEventListener('input', function() {
+                    if (!userAnswers[currentQuestion]) {
+                        userAnswers[currentQuestion] = {};
+                    }
+                    userAnswers[currentQuestion].answer = this.value;
+                });
+            }
+            
+            // Load voices for speech synthesis
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = function() {
+                    // Voices loaded
+                };
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        if (!document.getElementById('interview-screen').classList.contains('hidden')) {
+                            getFeedback();
+                        }
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        previousQuestion();
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        if (!document.getElementById('next-btn').classList.contains('hidden')) {
+                            nextQuestion();
+                        }
+                        break;
+                }
+            }
+        });
+
+        // Add CSS class for badges
+        const style = document.createElement('style');
+        style.textContent = `
+            .badge {
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+            .badge.sql {
+                background: linear-gradient(135deg, #f59e0b, #d97706);
+                color: white;
+            }
+            .badge.python {
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+            }
+            .badge.machine-learning {
+                background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                color: white;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
