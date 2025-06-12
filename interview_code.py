@@ -1,359 +1,804 @@
-import streamlit as st
-import requests
-import json
-import time
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced AI Interview Coach</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-# --- CONFIGURATION ---
-# IMPORTANT: Replace with your actual Gemini API Key.
-# Keeping API keys in code is not recommended for production. Consider using environment variables or Streamlit secrets.
-GEMINI_API_KEY = "AIzaSyAfzl_66GZsgaYjAM7cT2djVCBCAr86t2k"
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
 
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-# --- PAGE SETUP ---
-st.set_page_config(
-    page_title="AI Interview Coach",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+        .header {
+            text-align: center;
+            padding: 2rem 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-# --- CUSTOM CSS ---
-st.markdown("""
-<style>
-    /* Base styling for dark theme */
-    .stApp {
-        background-color: #0f172a; /* slate-900 */
-        color: #f8fafc; /* slate-50 */
-    }
-    
-    h1, h2, h3, h4, h5, h6 {
-        color: #f8fafc;
-    }
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #60a5fa, #34d399, #fbbf24);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
 
-    .stButton>button {
-        transition: all 0.3s ease;
-        border-radius: 9999px;
-        padding: 0.5rem 1.5rem;
-        font-weight: 600;
-        border: none;
-    }
+        @keyframes glow {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.2); }
+        }
 
-    /* Primary Button Style */
-    .stButton>button[kind="primary"] {
-        background: linear-gradient(135deg, #38bdf8, #3b82f6);
-        color: white;
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-    }
-    .stButton>button[kind="primary"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-    }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
 
-    /* Secondary Button Style */
-    .stButton>button[kind="secondary"] {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    .stButton>button[kind="secondary"]:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
-    
-    .stTextArea textarea {
-        background-color: #1e293b; /* slate-800 */
-        color: #f8fafc;
-        border-color: #334155; /* slate-700 */
-    }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
 
-    /* Glassmorphism Container */
-    .glassmorphism {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 1rem;
-        padding: 2rem;
-        margin-bottom: 2rem;
-    }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+        }
 
-    /* Custom Header */
-    .main-header {
-        text-align: center;
-        padding: 2rem;
-    }
-    .main-header h1 {
-        font-size: 3rem;
-        font-weight: bold;
-        background: -webkit-linear-gradient(45deg, #38bdf8, #3b82f6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
+        .progress-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50px;
+            padding: 4px;
+            margin-bottom: 2rem;
+        }
 
-    /* AI Voice Simulation */
-    .ai-voice {
-        background-color: #1e293b;
-        border-left: 5px solid #38bdf8;
-        padding: 1rem 1.5rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1.5rem;
-        font-style: italic;
-    }
-    
-    /* Feedback container */
-    .feedback-container {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 1.5rem;
-        border-radius: 0.75rem;
-    }
-    
-</style>
-""", unsafe_allow_html=True)
+        .progress-bar {
+            height: 12px;
+            background: linear-gradient(90deg, #60a5fa, #34d399);
+            border-radius: 50px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
 
+        .progress-text {
+            text-align: center;
+            margin-top: 0.5rem;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
 
-# --- QUESTIONS DATA ---
-questions = [
-    {
-        "section": "SQL", "type": "sql", "question": "Write a SQL query to find the top 3 customers by total order amount from the given tables.",
-        "context": """<p class="mb-2 font-semibold">customers table:</p><pre>customer_id | name\n1 | John Doe\n2 | Jane Smith\n...</pre><p class="mt-4 mb-2 font-semibold">orders table:</p><pre>order_id | customer_id | amount\n101 | 1 | 500.00\n102 | 2 | 750.00\n...</pre>""",
-        "voice_text": "For your first question: Write a SQL query to find the top 3 customers by total order amount. You'll need to join the customer and order tables, and use aggregation.",
-    },
-    {
-        "section": "SQL", "type": "sql", "question": "Write a query to find employees who earn more than the average salary in their department.",
-        "context": """<p class="font-semibold">employees table:</p><pre>emp_id | name | department | salary\n1 | Alice | Engineering | 90000\n2 | Bob | Engineering | 85000\n...</pre>""",
-        "voice_text": "Next SQL question: Write a query to find employees who earn more than the average salary in their respective departments. Consider using a subquery or a window function.",
-    },
-    {
-        "section": "Python", "type": "python", "question": "Write a Python function to find the second largest number in a list. Handle edge cases.",
-        "context": """<pre><code>find_second_largest([1, 3, 4, 5, 2]) → 4\nfind_second_largest([1, 1, 1]) → None</code></pre>""",
-        "voice_text": "Let's move to Python. Write a function to find the second largest number in a list. Remember to handle edge cases like lists with duplicates or fewer than two unique elements.",
-    },
-    {
-        "section": "Python", "type": "python", "question": "Implement a function to reverse words in a sentence while keeping the word order intact.",
-        "context": """<pre><code>reverse_words("Hello World Python") → "olleH dlroW nohtyP"</code></pre>""",
-        "voice_text": "Another Python challenge: Implement a function that reverses each word in a sentence but keeps the order of the words the same.",
-    },
-    {
-        "section": "Machine Learning", "type": "ml", "question": "Explain the difference between supervised and unsupervised learning with examples.",
-        "context": "<p>Discuss data (labeled vs. unlabeled), goals (prediction vs. discovery), and provide examples of common algorithms for each.</p>",
-        "voice_text": "Now for Machine Learning. Please explain the core differences between supervised and unsupervised learning. Include examples of algorithms and problems each type is suited for.",
-    },
-    {
-        "section": "Machine Learning", "type": "ml", "question": "What is overfitting in machine learning and how can you prevent it?",
-        "context": "<p>Describe what overfitting is, and discuss at least three common techniques to prevent it (e.g., regularization, cross-validation, dropout).</p>",
-        "voice_text": "Final question: What is overfitting in machine learning? Explain how you would detect it and describe several common techniques used to prevent it.",
-    }
-]
+        .ai-voice-container {
+            background: linear-gradient(135deg, #1e40af, #7c3aed);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
 
+        .ai-voice-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
 
-# --- SESSION STATE INITIALIZATION ---
-if 'current_question' not in st.session_state:
-    st.session_state.current_question = 0
-if 'user_answers' not in st.session_state:
-    st.session_state.user_answers = {} # { 0: { "answer": "...", "score": 85, "feedback": "..." } }
-if 'interview_started' not in st.session_state:
-    st.session_state.interview_started = False
-if 'interview_completed' not in st.session_state:
-    st.session_state.interview_completed = False
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
 
+        .ai-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #60a5fa, #34d399);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-right: 1rem;
+            animation: pulse 2s infinite;
+        }
 
-# --- API CALL ---
-def get_llm_feedback(question_text, answer):
-    prompt = f"""
-        You are an expert data science interview coach. Your role is to provide clear, constructive, and encouraging feedback to a student.
-        The user was asked the following question:
-        Question: "{question_text}"
-        
-        The user provided this answer:
-        Answer: "{answer}"
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
 
-        Your task is to analyze the user's answer.
-        Please provide your response as a single, valid JSON object with two keys: "score" and "feedback".
-        1.  "score": An integer between 0 and 100, representing the quality of the answer. A perfect answer is 100. A completely wrong or empty answer is 0.
-        2.  "feedback": A string containing detailed, constructive feedback in Markdown format. The feedback should:
-            - Start with a brief, one-sentence summary of the answer's quality.
-            - Create a "Strengths" section listing what the user did well.
-            - Create an "Areas for Improvement" section with specific, actionable suggestions.
-            - Be encouraging and educational in tone.
-    """
-    
-    headers = {'Content-Type': 'application/json'}
-    payload = json.dumps({"contents": [{"role": "user", "parts": [{"text": prompt}]}]})
-    
-    try:
-        response = requests.post(GEMINI_API_URL, headers=headers, data=payload)
-        response.raise_for_status()
-        result_json = response.json()
-        
-        feedback_text = result_json['candidates'][0]['content']['parts'][0]['text']
-        feedback_text = feedback_text.replace('```json', '').replace('```', '').strip()
-        
-        return json.loads(feedback_text)
-        
-    except requests.exceptions.RequestException as e:
-        st.error(f"Network error: Could not connect to the API. Please check your connection. Details: {e}")
-    except (KeyError, IndexError, json.JSONDecodeError) as e:
-        st.error(f"API response is not in the expected format. Please check your API key and the model's availability. Details: {e}")
-        # Return a default error feedback structure
-        return {"score": 0, "feedback": f"Could not parse the feedback from the AI. Error: {e}"}
-    return None
+        .ai-message {
+            display: flex;
+            align-items: center;
+            color: white;
+            font-weight: 500;
+        }
 
+        .voice-controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
 
-# --- UI RENDERING FUNCTIONS ---
-def display_welcome():
-    st.markdown("""
-    <div class="main-header">
-        <h1>Advanced AI Interview Coach</h1>
-        <p style="font-size: 1.2rem; color: #cbd5e1;">Hone your Data Science skills with AI-powered interviews and real-time, LLM-driven feedback.</p>
-    </div>
-    """, unsafe_allow_html=True)
+        .voice-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
 
-    with st.container():
-        st.markdown('<div class="glassmorphism">', unsafe_allow_html=True)
-        st.markdown("### 🎯 Interview Structure")
-        st.markdown("""
-        - **📊 2 SQL questions** on database querying and joins.
-        - **🐍 2 Python questions** on logic and algorithms.
-        - **🤖 2 Machine Learning questions** on core concepts.
-        """)
+        .voice-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
 
-        st.markdown('<p style="text-align: center; margin-top: 2rem;">Are you ready to begin?</p>', unsafe_allow_html=True)
-        
-        cols = st.columns([1, 1, 1])
-        if cols[1].button("🚀 Start Interview", type="primary", use_container_width=True):
-            st.session_state.interview_started = True
-            st.rerun()
+        .voice-btn.active {
+            background: #10b981;
+        }
+
+        .question-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #60a5fa;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .question-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 1rem;
+        }
+
+        .question-context {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-family: 'Monaco', monospace;
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .answer-container {
+            margin-bottom: 2rem;
+        }
+
+        .answer-textarea {
+            width: 100%;
+            min-height: 200px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #f8fafc;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        .answer-textarea:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 20px rgba(96, 165, 250, 0.3);
+        }
+
+        .answer-textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(59, 130, 246, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2rem;
+        }
+
+        .feedback-container {
+            background: linear-gradient(135deg, #065f46, #047857);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .score-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: conic-gradient(#10b981 0deg, #10b981 var(--score-deg), #374151 var(--score-deg), #374151 360deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            position: relative;
+        }
+
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: #065f46;
+            border-radius: 50%;
+        }
+
+        .score-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .typing-effect {
+            overflow: hidden;
+            border-right: 2px solid #60a5fa;
+            white-space: nowrap;
+            animation: typing 3s steps(40, end), blink 0.5s step-end infinite alternate;
+        }
+
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        @keyframes blink {
+            50% { border-color: transparent; }
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #60a5fa;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .analysis-card {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        .analysis-card.sql {
+            border-color: #f59e0b;
+        }
+
+        .analysis-card.python {
+            border-color: #10b981;
+        }
+
+        .analysis-card.ml {
+            border-color: #8b5cf6;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
             
-        st.markdown('</div>', unsafe_allow_html=True)
+            .navigation {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .ai-message {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .ai-avatar {
+                margin-right: 0;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen">
+            <div class="header">
+                <h1><i class="fas fa-robot"></i> Advanced AI Interview Coach</h1>
+                <p class="subtitle">Master Data Science with AI-Powered Voice Assistant & Real-Time Feedback</p>
+            </div>
 
-
-def display_question():
-    idx = st.session_state.current_question
-    question = questions[idx]
-    
-    # Progress Bar
-    progress = (idx + 1) / len(questions)
-    st.progress(progress, text=f"Question {idx + 1} of {len(questions)} - {question['section']} Section")
-
-    with st.container():
-        st.markdown('<div class="glassmorphism">', unsafe_allow_html=True)
-        
-        # AI Voice Simulation
-        st.markdown(f'<div class="ai-voice">🎤 <strong>AI Interviewer:</strong> <em>"{question["voice_text"]}"</em></div>', unsafe_allow_html=True)
-
-        # Question Details
-        st.markdown(f"### {question['question']}")
-        st.markdown(question['context'], unsafe_allow_html=True)
-        
-        # Answer Area
-        answer_key = f"answer_{idx}"
-        saved_answer = st.session_state.user_answers.get(idx, {}).get("answer", "")
-        answer = st.text_area("Your Answer:", value=saved_answer, height=200, key=answer_key, placeholder="Type your answer here...")
-
-        # Update answer in session state as user types
-        st.session_state.user_answers[idx] = st.session_state.user_answers.get(idx, {})
-        st.session_state.user_answers[idx]['answer'] = answer
-        
-        # Buttons and Feedback
-        submitted = (st.session_state.user_answers.get(idx, {}).get("score") is not None)
-        
-        if submitted:
-            feedback_data = st.session_state.user_answers[idx]
-            st.markdown('<div class="feedback-container">', unsafe_allow_html=True)
-            st.markdown(f"#### 🤖 AI Feedback (Score: {feedback_data['score']}/100)")
-            st.markdown(feedback_data['feedback'])
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            if st.button("Get Feedback 🤖", type="primary"):
-                if not answer.strip():
-                    st.warning("Please provide an answer before getting feedback.")
-                else:
-                    with st.spinner("Analyzing your answer..."):
-                        feedback = get_llm_feedback(question['question'], answer)
-                        if feedback:
-                            st.session_state.user_answers[idx].update(feedback)
-                            st.rerun()
-        
-        # Navigation
-        st.markdown("<br>", unsafe_allow_html=True)
-        cols = st.columns([1, 5, 1])
-        if idx > 0:
-            if cols[0].button("⬅️ Previous", use_container_width=True):
-                st.session_state.current_question -= 1
-                st.rerun()
-        
-        if submitted:
-            button_text = "Finish Interview 🏁" if idx == len(questions) - 1 else "Next ➡️"
-            if cols[2].button(button_text, use_container_width=True):
-                if idx == len(questions) - 1:
-                    st.session_state.interview_completed = True
-                else:
-                    st.session_state.current_question += 1
-                st.rerun()
+            <div class="glass-card">
+                <h2 style="text-align: center; margin-bottom: 2rem; color: #60a5fa;">
+                    <i class="fas fa-graduation-cap"></i> Interview Structure
+                </h2>
                 
-        st.markdown('</div>', unsafe_allow_html=True)
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <i class="fas fa-database feature-icon" style="color: #f59e0b;"></i>
+                        <h3 style="color: #f1f5f9;">SQL Mastery</h3>
+                        <p style="color: #cbd5e1;">2 Advanced database queries and optimization challenges</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fab fa-python feature-icon" style="color: #10b981;"></i>
+                        <h3 style="color: #f1f5f9;">Python Expertise</h3>
+                        <p style="color: #cbd5e1;">2 Algorithm and data structure problems</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-brain feature-icon" style="color: #8b5cf6;"></i>
+                        <h3 style="color: #f1f5f9;">ML Concepts</h3>
+                        <p style="color: #cbd5e1;">2 Machine learning theory and applications</p>
+                    </div>
+                </div>
 
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <i class="fas fa-microphone feature-icon" style="color: #06b6d4;"></i>
+                        <h3 style="color: #f1f5f9;">Voice Assistant</h3>
+                        <p style="color: #cbd5e1;">AI speaks questions automatically with voice controls</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-chart-line feature-icon" style="color: #f472b6;"></i>
+                        <h3 style="color: #f1f5f9;">Real-time Analysis</h3>
+                        <p style="color: #cbd5e1;">Instant AI feedback with detailed scoring</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-trophy feature-icon" style="color: #facc15;"></i>
+                        <h3 style="color: #f1f5f9;">Performance Tracking</h3>
+                        <p style="color: #cbd5e1;">Comprehensive analytics and improvement tips</p>
+                    </div>
+                </div>
 
-def display_analysis():
-    st.markdown('<div class="main-header"><h1>📊 Interview Analysis</h1></div>', unsafe_allow_html=True)
-    st.markdown('<div class="glassmorphism">', unsafe_allow_html=True)
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button class="btn btn-primary" onclick="startInterview()">
+                        <i class="fas fa-rocket"></i> Launch Interview Experience
+                    </button>
+                </div>
+            </div>
+        </div>
 
-    total_score = 0
-    section_scores = {'SQL': [], 'Python': [], 'Machine Learning': []}
-    
-    for i in range(len(questions)):
-        data = st.session_state.user_answers.get(i, {'score': 0})
-        score = data.get('score', 0)
-        total_score += score
-        section_scores[questions[i]['section']].append(score)
-        
-    overall_score = total_score / len(questions)
+        <!-- Interview Screen -->
+        <div id="interview-screen" class="hidden">
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+                <div class="progress-text" id="progress-text"></div>
+            </div>
 
-    # Overall Score
-    st.markdown(f'<h2 style="text-align: center;">Overall Performance: <span style="color:#38bdf8;">{overall_score:.0f}%</span></h2>', unsafe_allow_html=True)
-    st.progress(overall_score / 100)
+            <div class="ai-voice-container">
+                <div class="ai-message">
+                    <div class="ai-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.1rem; margin-bottom: 0.5rem;">
+                            <i class="fas fa-microphone-alt"></i> AI Interview Assistant
+                        </div>
+                        <div id="ai-speech-text" class="typing-effect"></div>
+                        <div class="voice-controls">
+                            <button class="voice-btn" onclick="toggleVoice()" id="voice-toggle">
+                                <i class="fas fa-volume-up"></i> Voice On
+                            </button>
+                            <button class="voice-btn" onclick="repeatQuestion()">
+                                <i class="fas fa-redo"></i> Repeat
+                            </button>
+                            <button class="voice-btn" onclick="speakAnswer()" id="speak-answer">
+                                <i class="fas fa-ear"></i> Speak Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    # Section Scores
-    st.markdown("### Performance by Section")
-    cols = st.columns(3)
-    icons = {'SQL': '📊', 'Python': '🐍', 'Machine Learning': '🤖'}
-    for i, section in enumerate(section_scores):
-        avg_score = sum(section_scores[section]) / len(section_scores[section])
-        with cols[i]:
-            st.markdown(f"**{icons[section]} {section}**")
-            st.markdown(f"<h3 style='color:#818cf8;'>{avg_score:.0f}%</h3>", unsafe_allow_html=True)
-            st.progress(avg_score/100)
-    
-    st.divider()
+            <div class="glass-card">
+                <div class="question-section">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div id="section-badge" class="badge"></div>
+                        <h2 class="question-title" id="question-title"></h2>
+                    </div>
+                    <div id="question-context" class="question-context"></div>
+                </div>
 
-    # Detailed Analysis
-    st.markdown("### Detailed Question Analysis")
-    for i, q in enumerate(questions):
-        data = st.session_state.user_answers.get(i, {})
-        answer = data.get('answer', 'No answer provided.')
-        score = data.get('score', 0)
-        feedback = data.get('feedback', 'No feedback generated.')
+                <div class="answer-container">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #e2e8f0;">
+                        <i class="fas fa-pen"></i> Your Solution:
+                    </label>
+                    <textarea 
+                        id="answer-input" 
+                        class="answer-textarea" 
+                        placeholder="Type your detailed answer here... The AI will analyze your response for technical accuracy, clarity, and completeness."
+                    ></textarea>
+                </div>
 
-        with st.expander(f"Q{i+1}: {q['section']} - {q['question']} (Score: {score})"):
-            st.markdown("**Your Answer:**")
-            st.info(answer)
-            st.markdown("**AI Feedback:**")
-            st.success(feedback)
+                <div style="text-align: center; margin: 1.5rem 0;">
+                    <button class="btn btn-success" onclick="getFeedback()" id="feedback-btn">
+                        <i class="fas fa-brain"></i> Get AI Analysis
+                    </button>
+                </div>
 
-    st.markdown('</div>', unsafe_allow_html=True)
+                <div id="feedback-container" class="hidden"></div>
 
-    # Restart Button
-    cols = st.columns([1, 1, 1])
-    if cols[1].button("🔄 Take Interview Again", type="primary", use_container_width=True):
-        # Reset session state
-        st.session_state.clear()
-        st.rerun()
+                <div class="navigation">
+                    <button class="btn btn-secondary" onclick="previousQuestion()" id="prev-btn">
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </button>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="nextQuestion()" id="next-btn" class="hidden">
+                            Next <i class="fas fa-arrow-right"></i>
+                        </button>
+                        <button class="btn btn-primary" onclick="finishInterview()" id="finish-btn" class="hidden">
+                            <i class="fas fa-flag-checkered"></i> Complete Interview
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Results Screen -->
+        <div id="results-screen" class="hidden">
+            <div class="header">
+                <h1><i class="fas fa-chart-bar"></i> Interview Analysis Report</h1>
+                <p class="subtitle">Comprehensive AI-Generated Performance Assessment</p>
+            </div>
 
-# --- MAIN APP LOGIC ---
-if not st.session_state.interview_started:
-    display_welcome()
-elif not st.session_state.interview_completed:
-    display_question()
-else:
-    display_analysis()
+            <div class="glass-card">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <div style="display: inline-block; position: relative;">
+                        <div class="score-circle" id="overall-score-circle">
+                            <span class="score-text" id="overall-score-text">0%</span>
+                        </div>
+                    </div>
+                    <h2 style="margin-top: 1rem; color: #60a5fa;">Overall Performance</h2>
+                </div>
+
+                <div class="analysis-grid" id="section-analysis"></div>
+
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button class="btn btn-primary" onclick="restartInterview()">
+                        <i class="fas fa-refresh"></i> Take Another Interview
+                    </button>
+                    <button class="btn btn-secondary" onclick="downloadReport()" style="margin-left: 1rem;">
+                        <i class="fas fa-download"></i> Download Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Interview Data
+        const questions = [
+            {
+                section: "SQL",
+                type: "sql",
+                question: "Write a SQL query to find the top 3 customers by total order amount from the given tables.",
+                context: `<strong>customers table:</strong><br><pre>customer_id | name<br>1 | John Doe<br>2 | Jane Smith<br>...</pre><br><strong>orders table:</strong><br><pre>order_id | customer_id | amount<br>101 | 1 | 500.00<br>102 | 2 | 750.00<br>...</pre>`,
+                voiceText: "For your first question: Write a SQL query to find the top 3 customers by total order amount. You'll need to join the customer and order tables, and use aggregation."
+            },
+            {
+                section: "SQL",
+                type: "sql", 
+                question: "Write a query to find employees who earn more than the average salary in their department.",
+                context: `<strong>employees table:</strong><br><pre>emp_id | name | department | salary<br>1 | Alice | Engineering | 90000<br>2 | Bob | Engineering | 85000<br>...</pre>`,
+                voiceText: "Next SQL question: Write a query to find employees who earn more than the average salary in their respective departments. Consider using a subquery or a window function."
+            },
+            {
+                section: "Python",
+                type: "python",
+                question: "Write a Python function to find the second largest number in a list. Handle edge cases.",
+                context: `<pre><code>find_second_largest([1, 3, 4, 5, 2]) → 4<br>find_second_largest([1, 1, 1]) → None</code></pre>`,
+                voiceText: "Let's move to Python. Write a function to find the second largest number in a list. Remember to handle edge cases like lists with duplicates or fewer than two unique elements."
+            },
+            {
+                section: "Python", 
+                type: "python",
+                question: "Implement a function to reverse words in a sentence while keeping the word order intact.",
+                context: `<pre><code>reverse_words("Hello World Python") → "olleH dlroW nohtyP"</code></pre>`,
+                voiceText: "Another Python challenge: Implement a function that reverses each word in a sentence but keeps the order of the words the same."
+            },
+            {
+                section: "Machine Learning",
+                type: "ml",
+                question: "Explain the difference between supervised and unsupervised learning with examples.",
+                context: "<p>Discuss data (labeled vs. unlabeled), goals (prediction vs. discovery), and provide examples of common algorithms for each.</p>",
+                voiceText: "Now for Machine Learning. Please explain the core differences between supervised and unsupervised learning. Include examples of algorithms and problems each type is suited for."
+            },
+            {
+                section: "Machine Learning",
+                type: "ml", 
+                question: "What is overfitting in machine learning and how can you prevent it?",
+                context: "<p>Describe what overfitting is, and discuss at least three common techniques to prevent it (e.g., regularization, cross-validation, dropout).</p>",
+                voiceText: "Final question: What is overfitting in machine learning? Explain how you would detect it and describe several common techniques used to prevent it."
+            }
+        ];
+
+        // State Management
+        let currentQuestion = 0;
+        let userAnswers = {};
+        let voiceEnabled = true;
+        let speechSynthesis = window.speechSynthesis;
+
+        // Initialize
+        function startInterview() {
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('interview-screen').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const question = questions[currentQuestion];
+            
+            // Update progress
+            const progress = ((currentQuestion + 1) / questions.length) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('progress-text').textContent = `Question ${currentQuestion + 1} of ${questions.length} - ${question.section} Section`;
+
+            // Update question content
+            document.getElementById('question-title').textContent = question.question;
+            document.getElementById('question-context').innerHTML = question.context;
+            
+            // Update section badge
+            const badge = document.getElementById('section-badge');
+            badge.textContent = question.section;
+            badge.className = `badge ${question.section.toLowerCase().replace(' ', '-')}`;
+            
+            // Load saved answer
+            const savedAnswer = userAnswers[currentQuestion]?.answer || '';
+            document.getElementById('answer-input').value = savedAnswer;
+
+            // Update navigation
+            document.getElementById('prev-btn').style.display = currentQuestion > 0 ? 'block' : 'none';
+            
+            // Handle feedback display
+            const feedbackContainer = document.getElementById('feedback-container');
+            if (userAnswers[currentQuestion]?.feedback) {
+                displayFeedback(userAnswers[currentQuestion]);
+                document.getElementById('next-btn').classList.remove('hidden');
+                document.getElementById('finish-btn').classList.toggle('hidden', currentQuestion < questions.length - 1);
+            } else {
+                feedbackContainer.classList.add('hidden');
+                document.getElementById('next-btn').classList.add('hidden');
+                document.getElementById('finish-btn').classList.add('hidden');
+            }
+
+            // Speak question with typing effect
+            typeAndSpeak(question.voiceText);
+        }
+
+        function typeAndSpeak(text) {
+            const element = document.getElementById('ai-speech-text');
+            element.textContent = '';
+            element.style.width = '0';
+            
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeInterval);
+                    element.style.width = '100%';
+                    if (voiceEnabled) {
+                        speakText(text);
+                    }
+                }
+            }, 50);
+        }
+
+        function speakText(text) {
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 0.8;
+            
+            // Try to use a more natural voice
+            const voices = speechSynthesis.getVoices();
+            const preferredVoice = voices.find(voice => 
+                voice.name.includes('Google') || 
+                voice.name.includes('Microsoft') ||
+                voice.lang === 'en-US'
+            );
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+            }
+            
+            speechSynthesis.speak(utterance);
+        }
+
+        function toggleVoice() {
+            voiceEnabled = !voiceEnabled;
+            const btn = document.getElementById('voice-toggle');
+            btn.innerHTML = voiceEnabled ? 
+                '<i class="fas fa-volume-up"></i> Voice On' : 
+                '<i class="fas fa-volume-mute"></i> Voice Off';
+            btn.classList.toggle('active', voiceEnabled);
+            
+            if (!voiceEnabled) {
+                speechSynthesis.cancel();
+            }
+        }
+
+        function repeatQuestion() {
+            const question = questions[currentQuestion];
+            speakText(question.voiceText);
+        }
+
+        function speakAnswer() {
+            const answer = document.getElementById('answer-input').value;
+            if (answer.trim()) {
+                speakText("Here is your current answer: " + answer);
+            } else {
+                speakText("You haven't written an answer yet.");
+            }
+        }
+
+        async function getFeedback() {
+            const answer = document.getElementById('answer-input').value.trim();
+            if (!answer) {
+                alert('Please provide an answer before getting feedback.');
+                return;
+            }
+
+            // Save answer
+            if (!userAnswers[currentQuestion]) {
+                userAnswers[currentQuestion] = {};
+            }
+            userAnswers[currentQuestion].answer = answer;
+
+            // Show loading
+            const btn = document.getElementById('feedback-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span> Analyzing...';
+            btn.disabled = true;
+
+            // Simulate AI feedback (replace with actual API call)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const feedback = generateMockFeedback(questions[currentQuestion], answer);
+            userAnswers[currentQuestion] = { ...userAnswers[currentQuestion], ...feedback };
+            
+            displayFeedback(userAnswers[currentQuestion]);
+            
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            
+            // Show navigation
+            document.getElementById('next-btn').classList.remove('hidden');
+            if (currentQuestion === questions.length - 1) {
+                document.getElementById('finish-btn').classList.remove('hidden');
+            }
+
+            // Speak feedback summary
+            if (voiceEnabled) {
+                const summary = `Your score is ${feedback.score} out of 100. ${feedback.score >= 80 ? 'Excellent work!' : feedback.score >= 60 ? 'Good job, with room for
